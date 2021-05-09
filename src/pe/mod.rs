@@ -4,13 +4,13 @@ mod sections;
 mod header;
 
 use util::*;
-use sections::SectionHeader;
+use sections::Section;
 use header::PeHeader64;
 
 #[derive(Debug)]
 pub struct File {
     header: PeHeader64,
-    sections: Vec<SectionHeader>
+    sections: Vec<Section>
 }
 
 
@@ -33,27 +33,25 @@ impl File {
     }
 
     pub fn parse(i: Input) -> Result<Self> {
-        use nom::{
-            bytes::complete::take,
-            error::context,
-            sequence::tuple,
-            number::complete::*,
-            multi::count,
-        };
-
         let full_input = i;
+        let mut buf = i;
 
 
         // This need to be done in this ugly way so we can use the value from the header to determine
         // how many sections to parse.
-        let (i, header) = context("Header", header::PeHeader64::parse)(i)?;
+        let (i, header) = nom::error::context("Header", header::PeHeader64::parse)(i)?;
 
         let sec_count = header.number_of_sections() as usize;
-        let image_base = header.optional_header.windows_header.image_base;
+        let _image_base = header.optional_header.windows_header.image_base;
 
+        println!("Reading the {} section headers...", sec_count);
+        // As we know the size of a section header (40 bytes), we can
+        let slices = (&i).chunks(40);
         let mut sections = Vec::new();
-        for _ in 0..sec_count {
-            let(_, sec) = sections::SectionHeader::parse(full_input, i)?;
+        for slice in slices.take(sec_count) {
+            println!("{:#x?}", slice);
+            let(_, sec) = sections::Section::parse(full_input, slice)?;
+            println!("{:#x?}", sec);
             sections.push(sec);
         }
 

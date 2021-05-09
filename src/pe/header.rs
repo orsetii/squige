@@ -1,8 +1,5 @@
-﻿#[macro_use]
-use super::util::*;
+﻿use super::util::*;
 use std::convert::TryFrom;
-use nom::Offset;
-use super::sections::SectionHeader;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
@@ -86,8 +83,9 @@ impl TryFrom<u16> for Subsystem {
 impl_parse_for_enum!(Subsystem, le_u16);
 
 #[derive(PartialEq, Debug)]
+#[repr(C)]
 pub struct DataDirectory {
-    virtual_addr: Addr,
+    virtual_addr: Addr32,
     size: u32,
 }
 
@@ -100,7 +98,7 @@ impl DataDirectory {
             number::complete::*,
         };
         let (i,(virtual_addr, size)) = tuple((
-            context("Virtual Address", Addr::parse),
+            context("Virtual Address", Addr32::parse),
             context("Size", le_u32),
             ))(i)?;
         Ok((i, Self {
@@ -126,7 +124,7 @@ pub struct PeHeader64 {
     /// The file offset of the COFF symbol table,
     /// is zero if no COFF symbol table is present (it should be,
     /// since COFF debugging information support is deprecated).
-    pub pointer_to_symbol_table: Addr32,
+    pub pointer_to_sym_table: Addr32,
 
     /// The number of entries in the symbol table.
     /// Is zero if no COFF symbol table is present.
@@ -245,7 +243,7 @@ pub struct OptionalHeader64 {
 
     /// _the address of the entry point relative to the
     /// image base when the executable is loaded into memory.
-    pub address_of_entry_point: u32,
+    pub address_of_entry_point: Addr32,
 
     /// _the address relative to the image base of the beginning-of-code section
     /// when it is loaded into memory.
@@ -263,7 +261,7 @@ pub struct OptionalHeader64 {
 }
 
 
-// _tODO PE header bitflags and DLL Characteristics Bitflags aswell.
+// TODO PE header bitflags and DLL Characteristics Bitflags aswell.
 
 
 impl OptionalHeader64 {
@@ -456,11 +454,8 @@ pub struct DataDirectories {
     /// `.debug` - _the debug data starting address and size.
     debug_data: DataDirectory,
 
-    /// Reserved, **must** be zero.
-    architecture: DataDirectory,
-
     /// _the RVA of the value to be stored in the global pointer register.
-    global_ptr: DataDirectory,
+    global_ptr: Addr,
 
     /// `.tls` - _the thread local storage (_tLS) table address and size.
     tls_table: DataDirectory,
@@ -487,11 +482,10 @@ impl DataDirectories {
         use nom::{
             error::context,
             sequence::tuple,
-            number::complete::*,
         };
 
         let (i,(export_table, import_table, resource_table, exception_table, certificate_table,
-            base_relocation_table, debug_data, architecture, global_ptr, tls_table,
+            base_relocation_table, debug_data, _, global_ptr, tls_table,
             load_config_table, bound_import, iat, delay_import_descriptor,
             clr_runtime_header, _)) = tuple((
             context("ExportTable", DataDirectory::parse),
@@ -501,8 +495,8 @@ impl DataDirectories {
             context("CertificateTable", DataDirectory::parse),
             context("BaseRelocationTable", DataDirectory::parse),
             context("Debug", DataDirectory::parse),
-            context("Architecture", DataDirectory::parse),
-            context("GlobalPtr", DataDirectory::parse),
+            context("Architecture", nom::bytes::complete::tag(&[0, 0, 0, 0, 0, 0, 0, 0])), // NOTE: must be zero.
+            context("GlobalPtr", Addr::parse),
             context("TlsTable", DataDirectory::parse),
             context("LoadConfigTable", DataDirectory::parse),
             context("BoundImport", DataDirectory::parse),
@@ -520,7 +514,6 @@ impl DataDirectories {
             certificate_table,
             base_relocation_table,
             debug_data,
-            architecture,
             global_ptr,
             tls_table,
             load_config_table,

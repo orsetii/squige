@@ -1,7 +1,6 @@
 use super::util::*;
 use bitflags::*;
 use std::ops::Range;
-use nom::error::ErrorKind;
 
 bitflags! {
     #[allow(non_camel_case_types)]
@@ -63,24 +62,26 @@ bitflags! {
         /// Cannot be cached.
         const IMAGE_SCN_MEM_SHARED = 0x10000000;
         /// Can be executed as code.
-        const IMAGE_SCN_MEM_EXECUTE = 0x20000000;
+        const EXECUTE = 0x20000000;
         /// Can be read.
-        const IMAGE_SCN_MEM_READ = 0x40000000;
+        const READ = 0x40000000;
         /// Can be written to.
-        const IMAGE_SCN_MEM_WRITE = 0x80000000;
+        const WRITE = 0x80000000;
     }
 }
 
 
 impl_parse_for_enumflags!(Characteristics, le_u32);
 
-#[derive(PartialEq, Debug)]
-pub struct SectionHeader {
+
+
+#[derive(PartialEq)]
+pub struct Section {
 
     /// 8-byte, null-padded UTF-8 encoded string.
     /// If the string is exactly 8 characters long,
     /// there is no terminating null.
-    name: String,
+    name: SectionName,
 
     /// The total size of the section when loaded into memory
     /// If this value is greater than SizeOfRawData
@@ -128,7 +129,7 @@ pub struct SectionHeader {
 
 }
 
-impl SectionHeader {
+impl Section {
     pub fn parse<'a>(full_input: Input<'_>, i: Input<'a>) -> Result<'a, Self> {
         use nom::{
             bytes::complete::{ take, tag },
@@ -151,8 +152,8 @@ impl SectionHeader {
             context("NumberOfLinenumbers", tag(&[0, 0])),
             context("Characteristics", Characteristics::parse),
             ))(i)?;
-        let name = String::from_utf8_lossy(raw_name).trim().to_string();
-        Ok((i, Self{
+        let name: SectionName = String::from_utf8_lossy(raw_name).trim().to_string().into();
+        let result = Self {
             name,
             virtual_size,
             virtual_address,
@@ -163,10 +164,44 @@ impl SectionHeader {
             number_of_relocations,
             number_of_line_numbers: 0,
             characteristics,
-            data: i[pointer_to_raw_data as usize..][..size_of_raw_data as usize].to_vec(),
-        }))
+            data: full_input[pointer_to_raw_data.into()..][..size_of_raw_data as usize].to_vec(),
+        };
+        Ok((i, result))
     }
 
-    // Range where the segment is stored.
-    //pub fn range(&self) -> Range<Addr> {Range{}}
+
+    /// Range where the segment is stored.
+    #[allow(dead_code)]
+    pub fn range(&self) -> Range<Addr32> {
+        self.pointer_to_raw_data..self.pointer_to_raw_data + Addr32::from(self.size_of_raw_data)
+    }
+}
+
+use std::fmt;
+impl fmt::Debug for Section {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{:?} | {:?} | {} |",
+            self.name,
+            self.range(),
+            // the default Debug formatter is
+            // on the verbose side, let's print something like `RWX` instead
+            &[
+                (Characteristics::READ, "R"),
+                (Characteristics::WRITE, "W"),
+                (Characteristics::EXECUTE, "X")
+            ]
+                .iter()
+                .map(|&(flag, letter)| {
+                    if self.characteristics.contains(flag) {
+                        letter
+                    } else {
+                        "-"
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(""),
+        )
+    }
 }

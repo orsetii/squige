@@ -1,4 +1,3 @@
-use bitflags::*;
 pub type Input<'a> = &'a [u8];
 pub type Result<'a, O> = nom::IResult<Input<'a>, O, nom::error::VerboseError<Input<'a>>>;
 
@@ -141,5 +140,36 @@ impl Addr32 {
     pub fn parse(i: Input) -> Result<Self> {
         use nom::{combinator::map, number::complete::le_u32};
         map(le_u32, From::from)(i)
+    }
+}
+
+/// SectionName is a simple type that allows nicer display
+/// of section names, as the null-bytes required
+/// in the 8-byte fixed field look ugly, in debug or normal formatting.
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct SectionName {
+    name: String,
+}
+
+impl fmt::Debug for SectionName {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:>08}", self.name)
+    }
+}
+
+impl Into<String> for SectionName {
+    fn into(self) -> String {
+        self.name
+    }
+}
+
+// This will come in handy when parsing
+impl From<String> for SectionName {
+    fn from(s: String) -> Self {
+        let mut name = s;
+        name.remove_matches("\0");
+        Self{
+            name
+        }
     }
 }
