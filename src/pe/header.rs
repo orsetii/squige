@@ -85,6 +85,30 @@ impl TryFrom<u16> for Subsystem {
 
 impl_parse_for_enum!(Subsystem, le_u16);
 
+#[derive(PartialEq, Debug)]
+pub struct DataDirectory {
+    virtual_addr: Addr,
+    size: u32,
+}
+
+impl DataDirectory {
+
+    pub fn parse(i: Input) -> Result<Self> {
+        use nom::{
+            error::context,
+            sequence::tuple,
+            number::complete::*,
+        };
+        let (i,(virtual_addr, size)) = tuple((
+            context("Virtual Address", Addr::parse),
+            context("Size", le_u32),
+            ))(i)?;
+        Ok((i, Self {
+            virtual_addr,
+            size,
+        }))
+    }
+}
 
 #[derive(Debug)]
 pub struct PeHeader64 {
@@ -93,27 +117,27 @@ pub struct PeHeader64 {
     /// is AMD64 and `0x14C0` is i386.
     pub machine: Machine,
 
-    /// _the number of sections, aka the size of the section table.
+    /// The number of sections, aka the size of the section table.
     pub number_of_sections: u16,
 
-    // _the low 32 bits of the UNIX timestamp
+    // The low 32 bits of the UNIX timestamp
     pub time_date_stamp: u32,
 
-    /// _the file offset of the COFF symbol table,
+    /// The file offset of the COFF symbol table,
     /// is zero if no COFF symbol table is present (it should be,
-    /// since COFF debugging information support is deperecated).
-    pub pointer_to_sym_table: u32,
+    /// since COFF debugging information support is deprecated).
+    pub pointer_to_symbol_table: Addr32,
 
-    /// _the number of entries in the symbol table.
-    /// Is zero if no COFF symbol table is presnet.
+    /// The number of entries in the symbol table.
+    /// Is zero if no COFF symbol table is present.
     pub number_of_symbols: u32,
 
-    /// _the size of the optional header.
-    /// _this value should be zero for an object file.
+    /// The size of the optional header.
+    /// This value should be zero for an object file.
     pub size_of_optional_header: u16,
 
     /// Defines flags for various functionality in the executable.
-    // _tODO parse this properly under a bitfield type.
+    // TODO parse this properly under a bitfield type.
     pub characteristics: u16,
 
     /// The optional header!
@@ -151,8 +175,8 @@ impl PeHeader64 {
             context("Magic", tag(Self::MAGIC)),
             context("Machine", Machine::parse),
             context("NumberOfSections", le_u16),
-            context("_timeDateStamp", le_u32),
-            context("Pointer_toSymbol_table", le_u32),
+            context("TimeDateStamp", le_u32),
+            context("PointerToSymbolTable", Addr32::parse),
             context("NumberOfSymbols", le_u32),
             context("SizeOfOptionalHeader", le_u16),
             context("Characteristics", le_u16),
@@ -252,7 +276,6 @@ impl OptionalHeader64 {
             sequence::tuple,
             number::complete::*,
         };
-        // TODO as per the above parser
         let (i,(_, major_linker_version, minor_linker_version, size_of_code, size_of_initialized_data,
             size_of_uninitialized_data, address_of_entry_point, base_of_code,
             windows_header, data_directories)) = tuple((
@@ -264,7 +287,7 @@ impl OptionalHeader64 {
             context("SizeOfCode", le_u32),
             context("SizeOfInitializedData", le_u32),
             context("SizeOfUninitializedData", le_u32),
-            context("AddressOfEntryPoint", le_u32),
+            context("AddressOfEntryPoint", Addr32::parse),
             context("BaseOfCode", le_u32),
             // Windows
             context("Windows", WindowsFields::parse),
@@ -413,49 +436,49 @@ impl WindowsFields {
 pub struct DataDirectories {
 
     /// `.edata` - _the export table address and size.
-    export_table: u64,
+    export_table: DataDirectory,
 
     /// `.idata` - _the import table address and size.
-    import_table: u64,
+    import_table: DataDirectory,
 
     /// `.rsrc` - _the resource table address and size.
-    resource_table: u64,
+    resource_table: DataDirectory,
 
     /// `.pdata` - _the exception table address and size.
-    exception_table: u64,
+    exception_table: DataDirectory,
 
     /// _the certificate table address and size.
-    certificate_table: u64,
+    certificate_table: DataDirectory,
 
     /// `.reloc` - _the base relocation table address and size.
-    base_relocation_table: u64,
+    base_relocation_table: DataDirectory,
 
     /// `.debug` - _the debug data starting address and size.
-    debug_data: u64,
+    debug_data: DataDirectory,
 
     /// Reserved, **must** be zero.
-    architecture: u64,
+    architecture: DataDirectory,
 
     /// _the RVA of the value to be stored in the global pointer register.
-    global_ptr: u64,
+    global_ptr: DataDirectory,
 
     /// `.tls` - _the thread local storage (_tLS) table address and size.
-    tls_table: u64,
+    tls_table: DataDirectory,
 
     /// _the load configuration table address and size.
-    load_config_table: u64,
+    load_config_table: DataDirectory,
 
     /// _the bound import table address and size.
-    bound_import: u64,
+    bound_import: DataDirectory,
 
     /// _the import address table and size.
-    iat: u64,
+    iat: DataDirectory,
 
     /// _the delay import descriptor address and size.
-    delay_import_descriptor: u64,
+    delay_import_descriptor: DataDirectory,
 
     /// `.cormeta` (Object only) _the CLR runtime header address and size.
-    clr_runtime_header: u64,
+    clr_runtime_header: DataDirectory,
 
 }
 
@@ -468,26 +491,26 @@ impl DataDirectories {
         };
 
         let (i,(export_table, import_table, resource_table, exception_table, certificate_table,
-                 base_relocation_table, debug_data, architecture, global_ptr, tls_table,
-                 load_config_table, bound_import, iat, delay_import_descriptor,
-                clr_runtime_header, _)) = tuple((
-                context("ExportTable", le_u64),
-                context("ImportTable", le_u64),
-                context("ResourceTable", le_u64),
-                context("ExceptionTable", le_u64),
-                context("CertificateTable", le_u64),
-                context("BaseRelocationTable", le_u64),
-                context("Debug", le_u64),
-                context("Architecture", le_u64),
-                context("GlobalPtr", le_u64),
-                context("TlsTable", le_u64),
-                context("LoadConfigTable", le_u64),
-                context("BoundImport", le_u64),
-                context("IAT", le_u64),
-                context("DelayImportDescriptor", le_u64),
-                context("ClrRuntimeHeader", le_u64),
-                context("Padding", nom::bytes::complete::tag(&[0, 0, 0, 0, 0, 0, 0, 0])), // NOTE: must be zero.
-            ))(i)?;
+            base_relocation_table, debug_data, architecture, global_ptr, tls_table,
+            load_config_table, bound_import, iat, delay_import_descriptor,
+            clr_runtime_header, _)) = tuple((
+            context("ExportTable", DataDirectory::parse),
+            context("ImportTable", DataDirectory::parse),
+            context("ResourceTable", DataDirectory::parse),
+            context("ExceptionTable", DataDirectory::parse),
+            context("CertificateTable", DataDirectory::parse),
+            context("BaseRelocationTable", DataDirectory::parse),
+            context("Debug", DataDirectory::parse),
+            context("Architecture", DataDirectory::parse),
+            context("GlobalPtr", DataDirectory::parse),
+            context("TlsTable", DataDirectory::parse),
+            context("LoadConfigTable", DataDirectory::parse),
+            context("BoundImport", DataDirectory::parse),
+            context("IAT", DataDirectory::parse),
+            context("DelayImportDescriptor", DataDirectory::parse),
+            context("ClrRuntimeHeader", DataDirectory::parse),
+            context("Padding", nom::bytes::complete::tag(&[0, 0, 0, 0, 0, 0, 0, 0])), // NOTE: must be zero.
+        ))(i)?;
 
         Ok((i, Self {
             export_table,

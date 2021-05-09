@@ -52,7 +52,7 @@ impl File {
         let image_base = header.optional_header.windows_header.image_base;
 
         let mut sections = Vec::new();
-        for j in ..sec_count {
+        for _ in 0..sec_count {
             let(_, sec) = sections::SectionHeader::parse(full_input, i)?;
             sections.push(sec);
         }
