@@ -44,6 +44,9 @@ macro_rules! impl_parse_for_enumflags {
     };
 }
 
+use derive_more::*;
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HexDump<'a>(pub &'a [u8]);
 
 use std::fmt;
@@ -56,7 +59,12 @@ impl<'a> fmt::Debug for HexDump<'a> {
     }
 }
 
-use derive_more::*;
+impl<'a> From<&'a[u8]> for HexDump<'a> {
+    fn from(s: &'a[u8]) -> Self {
+        Self(s)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Add, Sub)]
 pub struct Addr(pub u64);
 
@@ -90,6 +98,13 @@ impl Into<usize> for Addr {
 impl From<u64> for Addr {
     fn from(x: u64) -> Self {
         Self(x)
+    }
+}
+
+impl From<Addr32> for Addr {
+    fn from(x: Addr32) -> Self {
+
+        Self(x.0 as u64)
     }
 }
 
