@@ -1,10 +1,6 @@
 ﻿use super::util::*;
-use std::convert::TryFrom;
-use crate::pe::sections;
-use colorful::core::colors::Color::CadetBlue1;
 use bitflags::*;
-use nom::Parser;
-use nom::error::VerboseErrorKind;
+use std::convert::TryFrom;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u16)]
@@ -141,7 +137,6 @@ bitflags! {
 }
 
 impl_parse_for_enumflags!(Characteristics, le_u16);
-
 
 #[derive(Debug)]
 pub struct PeHeader64 {
@@ -397,7 +392,7 @@ pub struct WindowsFields {
     pub number_of_rva_and_sizes: u32,
 }
 
-bitflags!{
+bitflags! {
     pub struct DllCharacteristics: u16 {
             /// Image can handle a high entropy 64-bit virtual address space.
             const IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA = 0x0020;
